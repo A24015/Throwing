@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Components/SphereComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "ItemBase.generated.h"
 
 UCLASS()
@@ -12,19 +14,38 @@ class THROWWEPON_API AItemBase : public AActor
 public:
 	AItemBase();
 
-	// 重さ倍率（小さいほどよく飛び、大きいほど重い）
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Stats")
-	float WeightMultiplier = 1.0f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	USphereComponent* HitCollision;
 
-	// 投げた時の基本ダメージ
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UStaticMeshComponent* ItemMesh;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Stats")
 	float BaseDamage = 10.0f;
 
-	// 持っている時の移動速度デバフ (0.2 = 20%遅くなる)
+	// 投げられている状態かどうかのフラグ
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Logic")
+	bool bIsThrown = false;
+
+protected:
+	virtual void BeginPlay() override;
+
+	// 当たり判定（Hit）発生時に呼ばれるC++関数
+	UFUNCTION()
+	void OnHit(
+		UPrimitiveComponent* HitComponent,
+		AActor* OtherActor,
+		UPrimitiveComponent* OtherComp,
+		FVector NormalImpulse,
+		const FHitResult& Hit
+	);
+
+public:
+	// 移動速度デバフ変数
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Stats")
 	float MovementSpeedDebuff = 0.0f;
 
-	// 実際の投擲力を計算するC++関数
-	UFUNCTION(BlueprintCallable, Category = "Item Logic")
-	float CalculateFinalLaunchForce(float RawChargeForce) const;
+	// 投擲力を計算する関数
+	UFUNCTION(BlueprintCallable, Category = "Item Stats")
+	float CalculateFinalLaunchForce(float RawChargeForce);
 };
