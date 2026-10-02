@@ -13,7 +13,7 @@ AThrowWeponGameState::AThrowWeponGameState()
 
 	bGameStarted = false;
 
-
+	bShowStart = false;
 
 }
 
@@ -24,4 +24,5 @@ void AThrowWeponGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME(AThrowWeponGameState, Countdown);
 	DOREPLIFETIME(AThrowWeponGameState, RemainingTime);
 	DOREPLIFETIME(AThrowWeponGameState, bGameStarted);
+	DOREPLIFETIME(AThrowWeponGameState, bShowStart);
 }

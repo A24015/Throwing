@@ -28,6 +28,9 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly)
 	bool bGameStarted;
 
+	UPROPERTY(Replicated, BlueprintReadOnly)
+	bool bShowStart;
+
 	virtual void GetLifetimeReplicatedProps(
 		TArray<FLifetimeProperty>& OutLifetimeProps
 	)const override;

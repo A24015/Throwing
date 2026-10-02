@@ -1,62 +1,81 @@
 #include "ThrowWeponGameMode.h"
+#include "ThrowWeponGameState.h"
 
 AThrowWeponGameMode::AThrowWeponGameMode()
 {
-	// 4人分のスポーン位置を設定
-	PlayerSpawnLocations[0] = FVector(-1500, -1500, 500);
-	PlayerSpawnLocations[1] = FVector(1500, -1500, 500);
-	PlayerSpawnLocations[2] = FVector(1500, 1500, 500);
-	PlayerSpawnLocations[3] = FVector(-1500, 1500, 500);
+	PlayerSpawnLocations[0] = FVector(0, 0, 100);
+	PlayerSpawnLocations[1] = FVector(500, 0, 100);
+	PlayerSpawnLocations[2] = FVector(0, 500, 100);
+	PlayerSpawnLocations[3] = FVector(500, 500, 100);
 
-	// 最初は0人
 	PlayerCount = 0;
 
-	Gametime = 180.0f;
-
-	Countdown = 3;
-
-	bCountdownActive = true;
-
-	ElapsedTime = 0.0f;
-
-	bGameStarted = false;
+	// 使用するGameStateを指定
+	GameStateClass = AThrowWeponGameState::StaticClass();
 }
 
 void AThrowWeponGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 
-	// プレイヤーが参加したときの処理
-	if (bCountdownActive)
+	// プレイヤーが参加したらカウントダウン開始
+	if (!GetWorldTimerManager().IsTimerActive(CountdownTimerHandle))
 	{
 		GetWorldTimerManager().SetTimer(
-			CountdownTimerHandle, this,
+			CountdownTimerHandle,
+			this,
 			&AThrowWeponGameMode::UpdateCountdown,
-			1.0f, true
+			1.0f,
+			true
 		);
 	}
 }
 
-void AThrowWeponGameMode::RestartPlayer(AController* NewPlayer)
+void AThrowWeponGameMode::UpdateCountdown()
 {
-	if (PlayerCount >= 4) {
+	AThrowWeponGameState* ThrowGameState =
+		GetGameState<AThrowWeponGameState>();
+
+	if (!ThrowGameState)
+	{
 		return;
 	}
-	FTransform SpawnTransform;
-	SpawnTransform.SetLocation(PlayerSpawnLocations[PlayerCount]);
 
-	RestartPlayerAtTransform(NewPlayer, SpawnTransform);
+	ThrowGameState->Countdown--;
 
-	PlayerCount++;
+	if (ThrowGameState->Countdown <= 0)
+	{
+		GetWorldTimerManager().ClearTimer(CountdownTimerHandle);
+
+		// START!を表示
+		ThrowGameState->bShowStart = true;
+
+		// 1秒後にSTART!を消す
+		GetWorldTimerManager().SetTimer(
+			StartTimerHandle,
+			this,
+			&AThrowWeponGameMode::HideStartText,
+			1.0f,
+			false
+		);
+	}
 }
 
 void AThrowWeponGameMode::UpdateGameTime()
 {
-	ElapsedTime += 1.0f;
+	AThrowWeponGameState* ThrowGameState =
+		GetGameState<AThrowWeponGameState>();
 
-	if (ElapsedTime >= Gametime)
+	if (!ThrowGameState)
 	{
-		ElapsedTime = Gametime;
+		return;
+	}
+
+	ThrowGameState->RemainingTime--;
+
+	if (ThrowGameState->RemainingTime <= 0)
+	{
+		ThrowGameState->RemainingTime = 0;
 
 		// 3分経過
 		GetWorldTimerManager().ClearTimer(GameTimerHandle);
@@ -65,23 +84,28 @@ void AThrowWeponGameMode::UpdateGameTime()
 	}
 }
 
-void AThrowWeponGameMode::UpdateCountdown()
+void AThrowWeponGameMode::HideStartText()
 {
-	Countdown--;
+	AThrowWeponGameState* ThrowGameState =
+		GetGameState<AThrowWeponGameState>();
 
-	if (Countdown <= 0) {
-		bCountdownActive = false;
-
-		bGameStarted = true;
-
-		GetWorldTimerManager().ClearTimer(CountdownTimerHandle);
-
-		GetWorldTimerManager().SetTimer(
-			GameTimerHandle,
-			this,
-			&AThrowWeponGameMode::UpdateGameTime,
-			1.0f,
-			true
-		);
+	if (!ThrowGameState)
+	{
+		return;
 	}
+
+	// START!を消す
+	ThrowGameState->bShowStart = false;
+
+	// ゲーム開始
+	ThrowGameState->bGameStarted = true;
+
+	// 3分タイマー開始
+	GetWorldTimerManager().SetTimer(
+		GameTimerHandle,
+		this,
+		&AThrowWeponGameMode::UpdateGameTime,
+		1.0f,
+		true
+	);
 }
