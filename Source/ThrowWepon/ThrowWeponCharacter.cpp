@@ -6,6 +6,7 @@
 #include "DrawDebugHelpers.h"
 #include "EnhancedInputComponent.h"
 #include "InputActionValue.h"
+#include "GameFramework/CharacterMovementComponent.h" // ノックバック同期用
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -18,6 +19,7 @@ AThrowWeponCharacter::AThrowWeponCharacter()
 
 	bReplicates = true;
 	SetReplicateMovement(true);
+
 	// カプセルサイズの設定
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 
@@ -40,29 +42,24 @@ void AThrowWeponCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	// Enhanced Input Component へキャストしてバインドを設定
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
-		// Jump
 		if (JumpAction)
 		{
 			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &AThrowWeponCharacter::DoJumpStart);
 			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &AThrowWeponCharacter::DoJumpEnd);
 		}
 
-		// Move
 		if (MoveAction)
 		{
 			EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AThrowWeponCharacter::Move);
 		}
 
-		// Look
 		if (LookAction)
 		{
 			EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AThrowWeponCharacter::Look);
 		}
 
-		// Mouse Look
 		if (MouseLookAction)
 		{
 			EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AThrowWeponCharacter::Look);
@@ -117,16 +114,25 @@ void AThrowWeponCharacter::DoJumpEnd()
 }
 
 // ---------------------------------------------------------
-// ダメージ処理
+// ダメージ & ノックバック処理
 // ---------------------------------------------------------
 
 void AThrowWeponCharacter::Multicast_OnDeath_Implementation()
 {
-	// ホスト・参加者双方の画面で物理（ラグドール）を有効化
+	// 入力を無効化
 	DisableInput(Cast<APlayerController>(GetController()));
-	GetMesh()->SetSimulatePhysics(true);
-	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
+
+	// 被弾直前の移動速度（勢い）を記録
+	FVector LastVelocity = GetVelocity();
+
+	// カプセルの当たり判定を消してラグドール化
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
+	GetMesh()->SetSimulatePhysics(true);
+
+	// ラグドール化した瞬間に被弾時の吹っ飛び力（インパルス）を加える
+	FVector DeathLaunchForce = (LastVelocity.GetSafeNormal() + FVector(0.f, 0.f, 0.5f)).GetSafeNormal() * 1500.0f;
+	GetMesh()->AddImpulse(DeathLaunchForce, NAME_None, true);
 }
 
 float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
@@ -137,51 +143,33 @@ float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& D
 	{
 		Health = FMath::Clamp(Health - ActualDamage, 0.0f, MaxHealth);
 
+		// --- 被弾方向の計算 ---
+		FVector HitDirection = GetActorForwardVector() * -1.0f; // 基本は後ろ方向
+		if (DamageCauser)
+		{
+			// ボール（DamageCauser）から被弾者へのベクトル
+			HitDirection = (GetActorLocation() - DamageCauser->GetActorLocation()).GetSafeNormal();
+		}
+
 		// 死亡判定
 		if (Health <= 0.0f)
 		{
-			// サーバーから全員へ「死亡処理を実行しろ」と命令を投げる
+			// 被弾方向の強大なベクトルを一度 Launch して勢いをつけた直後に Multicast_OnDeath を呼ぶ
+			FVector FatalKnockback = (HitDirection + FVector(0.f, 0.f, 0.6f)).GetSafeNormal() * 2000.0f;
+			LaunchCharacter(FatalKnockback, true, true);
+
+			// 全員にラグドール死亡通知
 			Multicast_OnDeath();
+		}
+		else
+		{
+			// 通常被弾ノックバック（斜め後ろ上に押し出す）
+			FVector KnockbackVelocity = (HitDirection + FVector(0.f, 0.f, 0.35f)).GetSafeNormal() * 800.0f;
+			LaunchCharacter(KnockbackVelocity, true, true);
 		}
 	}
 	return ActualDamage;
 }
-//float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
-//{
-//	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
-//
-//	if (ActualDamage > 0.0f)
-//	{
-//		// HPを減らす
-//		Health = FMath::Clamp(Health - ActualDamage, 0.0f, MaxHealth);
-//
-//		// --- 画面上に「○○ ダメージヒット！」と表示 ---
-//		if (GEngine)
-//		{
-//			FString Message = FString::Printf(TEXT("%.1f ダメージヒット！ (残HP: %.1f)"), ActualDamage, Health);
-//
-//			// Key: -1 (新規行として追加), DisplayTime: 3.0秒, Color: 赤色
-//			GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red, Message);
-//		}
-//
-//		// --- 死亡判定（HPが0になった時の処理） ---
-//		if (Health <= 0.0f)
-//		{
-//			if (GEngine)
-//			{
-//				GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("プレイヤー死亡！"));
-//			}
-//
-//			// ラグドール化（物理で倒れる処理）
-//			DisableInput(Cast<APlayerController>(GetController()));
-//			GetMesh()->SetSimulatePhysics(true);
-//			GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
-//			GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-//		}
-//	}
-//
-//	return ActualDamage;
-//}
 
 // ---------------------------------------------------------
 // ライン判定処理（コンバット）
@@ -229,4 +217,3 @@ bool AThrowWeponCharacter::PerformLineTrace(FHitResult& OutHitResult, float Trac
 	OutHitResult = FHitResult();
 	return false;
 }
-

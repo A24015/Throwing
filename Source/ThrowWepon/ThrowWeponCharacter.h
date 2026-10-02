@@ -65,8 +65,6 @@ protected:
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
 
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_OnDeath();
 public:
 
 	/** Handles move inputs from either controls or UI interfaces */
@@ -95,6 +93,9 @@ public:
 	// --- ダメージ処理 ---
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_OnDeath();
 	// --- コンバット機能 ---
 	/**
 	 * カメラ正面に向かってライン判定を行います。
