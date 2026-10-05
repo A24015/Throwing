@@ -119,22 +119,16 @@ void AThrowWeponCharacter::DoJumpEnd()
 
 void AThrowWeponCharacter::Multicast_OnDeath_Implementation()
 {
-	// 入力を無効化
+	// 死亡したので入力を無効化（操作不能にする）
 	DisableInput(Cast<APlayerController>(GetController()));
 
-	// 被弾直前の移動速度（勢い）を記録
-	FVector LastVelocity = GetVelocity();
-
-	// カプセルの当たり判定を消してラグドール化
-	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
-	GetMesh()->SetSimulatePhysics(true);
-
-	// ラグドール化した瞬間に被弾時の吹っ飛び力（インパルス）を加える
-	FVector DeathLaunchForce = (LastVelocity.GetSafeNormal() + FVector(0.f, 0.f, 0.5f)).GetSafeNormal() * 1500.0f;
-	GetMesh()->AddImpulse(DeathLaunchForce, NAME_None, true);
+	// ※以前のラグドール化処理（SetSimulatePhysicsなど）は完全にカットし、
+	// CharacterMovement による綺麗な同期状態を維持します
 }
 
+// ---------------------------------------------------------
+// ダメージ & ノックバック処理
+// ---------------------------------------------------------
 float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
 	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
@@ -143,34 +137,39 @@ float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& D
 	{
 		Health = FMath::Clamp(Health - ActualDamage, 0.0f, MaxHealth);
 
-		// --- 被弾方向の計算 ---
+		// --- 1. 被弾方向の計算 ---
 		FVector HitDirection = GetActorForwardVector() * -1.0f; // 基本は後ろ方向
 		if (DamageCauser)
 		{
-			// ボール（DamageCauser）から被弾者へのベクトル
+			// ボール（DamageCauser）から被弾者へのベクトル（吹き飛び方向）
 			HitDirection = (GetActorLocation() - DamageCauser->GetActorLocation()).GetSafeNormal();
 		}
 
-		// 死亡判定
+		// --- 2. 慣性のリセット（ヒットストップ効果） ---
+		if (GetCharacterMovement())
+		{
+			GetCharacterMovement()->StopMovementImmediately();
+		}
+
+		// --- 3. 生存 / 死亡によるノックバックの分岐 ---
 		if (Health <= 0.0f)
 		{
-			// 被弾方向の強大なベクトルを一度 Launch して勢いをつけた直後に Multicast_OnDeath を呼ぶ
-			FVector FatalKnockback = (HitDirection + FVector(0.f, 0.f, 0.6f)).GetSafeNormal() * 2000.0f;
+			// 【死亡時】：超絶ノックバック（4500.0f）で超遠くまで撃墜風に吹っ飛ばす！
+			FVector FatalKnockback = (HitDirection + FVector(0.f, 0.f, 0.6f)).GetSafeNormal() * 4500.0f;
 			LaunchCharacter(FatalKnockback, true, true);
 
-			// 全員にラグドール死亡通知
+			// 全端末で操作不能（死亡扱い）にする
 			Multicast_OnDeath();
 		}
 		else
 		{
-			// 通常被弾ノックバック（斜め後ろ上に押し出す）
+			// 【通常被弾時】：軽めの通常ノックバック（800.0f）
 			FVector KnockbackVelocity = (HitDirection + FVector(0.f, 0.f, 0.35f)).GetSafeNormal() * 800.0f;
 			LaunchCharacter(KnockbackVelocity, true, true);
 		}
 	}
 	return ActualDamage;
 }
-
 // ---------------------------------------------------------
 // ライン判定処理（コンバット）
 // ---------------------------------------------------------
