@@ -1,110 +1,94 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #include "ThrowWeponCharacter.h"
-#include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
-#include "Components/CapsuleComponent.h"
-#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
-#include "GameFramework/Controller.h"
+#include "Components/CapsuleComponent.h"
+#include "Engine/World.h"
+#include "DrawDebugHelpers.h"
 #include "EnhancedInputComponent.h"
-#include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
-#include "ThrowWepon.h"
+#include "GameFramework/CharacterMovementComponent.h" // ノックバック同期用
 
+DEFINE_LOG_CATEGORY(LogTemplateCharacter);
+
+// ---------------------------------------------------------
+// コンストラクタ（カメラとカプセルコンポーネントの初期化）
+// ---------------------------------------------------------
 AThrowWeponCharacter::AThrowWeponCharacter()
 {
-	// Set size for collision capsule
+	PrimaryActorTick.bCanEverTick = true;
+
+	bReplicates = true;
+	SetReplicateMovement(true);
+
+	// カプセルサイズの設定
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
-		
-	// Don't rotate when the controller rotates. Let that just affect the camera.
-	bUseControllerRotationPitch = false;
-	bUseControllerRotationYaw = false;
-	bUseControllerRotationRoll = false;
 
-	// Configure character movement
-	GetCharacterMovement()->bOrientRotationToMovement = true;
-	GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f);
-
-	// Note: For faster iteration times these variables, and many more, can be tweaked in the Character Blueprint
-	// instead of recompiling to adjust them
-	GetCharacterMovement()->JumpZVelocity = 500.f;
-	GetCharacterMovement()->AirControl = 0.35f;
-	GetCharacterMovement()->MaxWalkSpeed = 500.f;
-	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
-	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
-	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
-
-	// Create a camera boom (pulls in towards the player if there is a collision)
+	// カメラブーム（スプリングアーム）の生成と初期化
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->TargetArmLength = 400.0f;
 	CameraBoom->bUsePawnControlRotation = true;
 
-	// Create a follow camera
+	// フォローカメラの生成と初期化
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
-
-	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
-	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
 
+// ---------------------------------------------------------
+// インプット初期化・バインド処理
+// ---------------------------------------------------------
 void AThrowWeponCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
-	// Set up action bindings
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
-		
-		// Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-		// Moving
-		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AThrowWeponCharacter::Move);
-		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AThrowWeponCharacter::Look);
-
-		// Looking
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AThrowWeponCharacter::Look);
-	}
-	else
+	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
-		UE_LOG(LogThrowWepon, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
+		if (JumpAction)
+		{
+			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &AThrowWeponCharacter::DoJumpStart);
+			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &AThrowWeponCharacter::DoJumpEnd);
+		}
+
+		if (MoveAction)
+		{
+			EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AThrowWeponCharacter::Move);
+		}
+
+		if (LookAction)
+		{
+			EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AThrowWeponCharacter::Look);
+		}
+
+		if (MouseLookAction)
+		{
+			EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AThrowWeponCharacter::Look);
+		}
 	}
 }
 
 void AThrowWeponCharacter::Move(const FInputActionValue& Value)
 {
-	// input is a Vector2D
 	FVector2D MovementVector = Value.Get<FVector2D>();
-
-	// route the input
 	DoMove(MovementVector.X, MovementVector.Y);
 }
 
 void AThrowWeponCharacter::Look(const FInputActionValue& Value)
 {
-	// input is a Vector2D
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
-
-	// route the input
 	DoLook(LookAxisVector.X, LookAxisVector.Y);
 }
 
 void AThrowWeponCharacter::DoMove(float Right, float Forward)
 {
-	if (GetController() != nullptr)
+	if (Controller != nullptr)
 	{
-		// find out which way is forward
-		const FRotator Rotation = GetController()->GetControlRotation();
+		const FRotator Rotation = Controller->GetControlRotation();
 		const FRotator YawRotation(0, Rotation.Yaw, 0);
 
-		// get forward vector
 		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-
-		// get right vector 
 		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-		// add movement 
 		AddMovementInput(ForwardDirection, Forward);
 		AddMovementInput(RightDirection, Right);
 	}
@@ -112,9 +96,8 @@ void AThrowWeponCharacter::DoMove(float Right, float Forward)
 
 void AThrowWeponCharacter::DoLook(float Yaw, float Pitch)
 {
-	if (GetController() != nullptr)
+	if (Controller != nullptr)
 	{
-		// add yaw and pitch input to controller
 		AddControllerYawInput(Yaw);
 		AddControllerPitchInput(Pitch);
 	}
@@ -122,12 +105,114 @@ void AThrowWeponCharacter::DoLook(float Yaw, float Pitch)
 
 void AThrowWeponCharacter::DoJumpStart()
 {
-	// signal the character to jump
 	Jump();
 }
 
 void AThrowWeponCharacter::DoJumpEnd()
 {
-	// signal the character to stop jumping
 	StopJumping();
+}
+
+// ---------------------------------------------------------
+// ダメージ & ノックバック処理
+// ---------------------------------------------------------
+
+void AThrowWeponCharacter::Multicast_OnDeath_Implementation()
+{
+	// 死亡したので入力を無効化（操作不能にする）
+	DisableInput(Cast<APlayerController>(GetController()));
+
+	// ※以前のラグドール化処理（SetSimulatePhysicsなど）は完全にカットし、
+	// CharacterMovement による綺麗な同期状態を維持します
+}
+
+// ---------------------------------------------------------
+// ダメージ & ノックバック処理
+// ---------------------------------------------------------
+float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+
+	if (ActualDamage > 0.0f)
+	{
+		Health = FMath::Clamp(Health - ActualDamage, 0.0f, MaxHealth);
+
+		// --- 1. 被弾方向の計算 ---
+		FVector HitDirection = GetActorForwardVector() * -1.0f; // 基本は後ろ方向
+		if (DamageCauser)
+		{
+			// ボール（DamageCauser）から被弾者へのベクトル（吹き飛び方向）
+			HitDirection = (GetActorLocation() - DamageCauser->GetActorLocation()).GetSafeNormal();
+		}
+
+		// --- 2. 慣性のリセット（ヒットストップ効果） ---
+		if (GetCharacterMovement())
+		{
+			GetCharacterMovement()->StopMovementImmediately();
+		}
+
+		// --- 3. 生存 / 死亡によるノックバックの分岐 ---
+		if (Health <= 0.0f)
+		{
+			// 【死亡時】：超絶ノックバック（4500.0f）で超遠くまで撃墜風に吹っ飛ばす！
+			FVector FatalKnockback = (HitDirection + FVector(0.f, 0.f, 0.6f)).GetSafeNormal() * 4500.0f;
+			LaunchCharacter(FatalKnockback, true, true);
+
+			// 全端末で操作不能（死亡扱い）にする
+			Multicast_OnDeath();
+		}
+		else
+		{
+			// 【通常被弾時】：軽めの通常ノックバック（800.0f）
+			FVector KnockbackVelocity = (HitDirection + FVector(0.f, 0.f, 0.35f)).GetSafeNormal() * 800.0f;
+			LaunchCharacter(KnockbackVelocity, true, true);
+		}
+	}
+	return ActualDamage;
+}
+// ---------------------------------------------------------
+// ライン判定処理（コンバット）
+// ---------------------------------------------------------
+bool AThrowWeponCharacter::PerformLineTrace(FHitResult& OutHitResult, float TraceDistance)
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	FVector Start;
+	FRotator Rotation;
+
+	if (FollowCamera)
+	{
+		Start = FollowCamera->GetComponentLocation();
+		Rotation = FollowCamera->GetComponentRotation();
+	}
+	else
+	{
+		Start = GetActorLocation();
+		Rotation = GetActorRotation();
+	}
+
+	FVector End = Start + (Rotation.Vector() * TraceDistance);
+
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(this);
+
+	bool bHit = World->LineTraceSingleByChannel(
+		OutHitResult,
+		Start,
+		End,
+		ECC_Visibility,
+		QueryParams
+	);
+
+	if (bHit && OutHitResult.GetActor() != nullptr)
+	{
+		return true;
+	}
+
+	OutHitResult = FHitResult();
+	return false;
 }
