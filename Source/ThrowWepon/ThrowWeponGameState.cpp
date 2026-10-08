@@ -17,6 +17,16 @@ AThrowWeponGameState::AThrowWeponGameState()
 
 }
 
+void AThrowWeponGameState::AddKill()
+{
+	KillCount++;
+}
+
+void AThrowWeponGameState::AddDeath()
+{
+	DeathCount++;
+}
+
 void AThrowWeponGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
