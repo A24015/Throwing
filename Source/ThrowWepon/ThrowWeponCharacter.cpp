@@ -1,4 +1,7 @@
 #include "ThrowWeponCharacter.h"
+#include"ThrowWeponGameState.h"
+#include"ThrowWeponGameMode.h"
+#include "ThrowWeponPlayerState.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -33,6 +36,9 @@ AThrowWeponCharacter::AThrowWeponCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
+
+	// 最初は生きている状態にする
+	bIsDead = false;
 }
 
 // ---------------------------------------------------------
@@ -154,12 +160,74 @@ float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& D
 		// --- 3. 生存 / 死亡によるノックバックの分岐 ---
 		if (Health <= 0.0f)
 		{
-			// 【死亡時】：超絶ノックバック（4500.0f）で超遠くまで撃墜風に吹っ飛ばす！
-			FVector FatalKnockback = (HitDirection + FVector(0.f, 0.f, 0.6f)).GetSafeNormal() * 4500.0f;
-			LaunchCharacter(FatalKnockback, true, true);
+			// まだ死亡処理をしていないか確認する
+			if (!bIsDead)
+			{
+				// 死亡済みの状態にする
+				bIsDead = true;
 
-			// 全端末で操作不能（死亡扱い）にする
-			Multicast_OnDeath();
+				// 自分のPlayerStateを取得する
+				AThrowWeponPlayerState* ThrowPlayerState =
+					GetPlayerState<AThrowWeponPlayerState>();
+
+				// このゲームで使っているGameModeを取得する
+				AThrowWeponGameMode* ThrowGameMode =
+					GetWorld()->GetAuthGameMode<AThrowWeponGameMode>();
+
+				// PlayerStateを取得できたか確認する
+				if (ThrowPlayerState)
+				{
+					// 死亡回数を1増やす
+					ThrowPlayerState->AddDeath();
+				}
+
+				// 攻撃したプレイヤーが存在するか確認する
+				if (EventInstigator)
+				{
+					// 攻撃したプレイヤーのPlayerStateを取得する
+					AThrowWeponPlayerState* AttackerPlayerState =
+						EventInstigator->GetPlayerState<AThrowWeponPlayerState>();
+
+					// 攻撃したプレイヤーのPlayerStateを取得できたか確認する
+					if (AttackerPlayerState)
+					{
+						// キル数を1増やす
+						AttackerPlayerState->AddKill();
+					}
+				}
+
+				// 死亡時のノックバックを計算する
+				FVector FatalKnockback =
+					(HitDirection + FVector(0.f, 0.f, 0.6f)).GetSafeNormal() * 4500.0f;
+
+				// キャラクターを吹き飛ばす
+				LaunchCharacter(FatalKnockback, true, true);
+
+				// 全端末に死亡処理を通知する
+				Multicast_OnDeath();
+
+				// 自分を操作しているプレイヤーのControllerを取得する
+				AController* PlayerController = GetController();
+
+				// Controllerが存在するか確認する
+				if (PlayerController)
+				{
+					// 3秒後にリスポーン処理を実行する
+					FTimerHandle RespawnTimer;
+
+					// タイマーにリスポーン処理を登録する
+					GetWorldTimerManager().SetTimer(
+						RespawnTimer,
+						[ThrowGameMode, PlayerController]()
+						{
+							// 指定したプレイヤーをリスポーンさせる
+							ThrowGameMode->RespawnPlayer(PlayerController);
+						},
+						3.0f,
+						false
+					);
+				}
+			}
 		}
 		else
 		{

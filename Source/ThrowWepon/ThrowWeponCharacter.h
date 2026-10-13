@@ -113,4 +113,8 @@ public:
 
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+	// このキャラクターがすでに死亡処理をしたか保存する変数
+	UPROPERTY()
+	bool bIsDead;
 };

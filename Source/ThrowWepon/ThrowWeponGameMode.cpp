@@ -1,5 +1,14 @@
 #include "ThrowWeponGameMode.h"
 #include "ThrowWeponGameState.h"
+#include "ThrowWeponPlayerState.h"
+// PlayerStartを探すためのもの
+#include "EngineUtils.h"
+
+// PlayerStartを使うためのもの
+#include "GameFramework/PlayerStart.h"
+
+// プレイヤーキャラクターを使うためのもの
+#include "ThrowWeponCharacter.h"
 
 AThrowWeponGameMode::AThrowWeponGameMode()
 {
@@ -11,7 +20,10 @@ AThrowWeponGameMode::AThrowWeponGameMode()
 	PlayerCount = 0;
 
 	// 使用するGameStateを指定
+
 	GameStateClass = AThrowWeponGameState::StaticClass();
+	// このゲームで使うPlayerStateを指定する
+	PlayerStateClass = AThrowWeponPlayerState::StaticClass();
 }
 
 void AThrowWeponGameMode::PostLogin(APlayerController* NewPlayer)
@@ -108,4 +120,68 @@ void AThrowWeponGameMode::HideStartText()
 		1.0f,
 		true
 	);
+
+	
+}
+
+// 死亡したプレイヤーをリスポーンさせる処理
+void AThrowWeponGameMode::RespawnPlayer(AController* PlayerController)
+{
+	// Controllerが存在するか確認する
+	if (!PlayerController)
+	{
+		return;
+	}
+
+	// 現在操作しているCharacterを取得する
+	AThrowWeponCharacter* OldCharacter =
+		Cast<AThrowWeponCharacter>(PlayerController->GetPawn());
+
+	// リスポーンする場所を保存する変数
+	AActor* RespawnPoint = nullptr;
+
+	// レベル内のPlayerStartを探す
+	for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+	{
+		// 見つかったPlayerStartをリスポーン場所にする
+		RespawnPoint = *It;
+
+		// 1つ見つけたのでループを終了する
+		break;
+	}
+
+	// PlayerStartが見つからなかった場合は終了する
+	if (!RespawnPoint)
+	{
+		return;
+	}
+
+	// 古いCharacterが存在するか確認する
+	if (OldCharacter)
+	{
+		// 古いCharacterを削除する
+		OldCharacter->Destroy();
+	}
+
+	// Characterを生成するときの設定
+	FActorSpawnParameters SpawnParams;
+
+	// Controllerを新しいCharacterの所有者にする
+	SpawnParams.Owner = PlayerController;
+
+	// 新しいCharacterを生成する
+	AThrowWeponCharacter* NewCharacter =
+		GetWorld()->SpawnActor<AThrowWeponCharacter>(
+			AThrowWeponCharacter::StaticClass(),
+			RespawnPoint->GetActorLocation(),
+			RespawnPoint->GetActorRotation(),
+			SpawnParams
+		);
+
+	// Characterを正常に生成できたか確認する
+	if (NewCharacter)
+	{
+		// Controllerを新しいCharacterに接続する
+		PlayerController->Possess(NewCharacter);
+	}
 }

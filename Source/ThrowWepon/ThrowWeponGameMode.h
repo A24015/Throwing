@@ -13,6 +13,9 @@ public:
 
 	AThrowWeponGameMode();
 
+	// 死亡したプレイヤーをリスポーンさせる処理
+	void RespawnPlayer(AController* PlayerController);
+
 protected:
 
 	virtual void PostLogin(APlayerController* NewPlayer) override;
@@ -38,4 +41,8 @@ private:
 	FTimerHandle StartTimerHandle;
 
 	void HideStartText();
+
+	
+
+	
 };

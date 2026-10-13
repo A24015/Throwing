@@ -31,6 +31,20 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly)
 	bool bShowStart;
 
+	// ƒLƒ‹”‚ğ•Û‘¶‚·‚é•Ï”
+	UPROPERTY(Replicated, BlueprintReadOnly)
+	int32 KillCount;
+
+	// €–S‰ñ”‚ğ•Û‘¶‚·‚é•Ï”
+	UPROPERTY(Replicated, BlueprintReadOnly)
+	int32 DeathCount;
+
+	// ƒLƒ‹”‚ğ1‘‚â‚·ˆ—
+	void AddKill();
+
+	// €–S‰ñ”‚ğ1‘‚â‚·ˆ—
+	void AddDeath();
+
 	virtual void GetLifetimeReplicatedProps(
 		TArray<FLifetimeProperty>& OutLifetimeProps
 	)const override;
