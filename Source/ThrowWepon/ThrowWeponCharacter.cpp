@@ -3,6 +3,7 @@
 #include"ThrowWeponGameMode.h"
 #include "ThrowWeponPlayerState.h"
 #include "Camera/CameraComponent.h"
+#include "Net/UnrealNetwork.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
@@ -39,6 +40,7 @@ AThrowWeponCharacter::AThrowWeponCharacter()
 
 	// 最初は生きている状態にする
 	bIsDead = false;
+	Health = MaxHealth; 
 }
 
 // ---------------------------------------------------------
@@ -283,4 +285,12 @@ bool AThrowWeponCharacter::PerformLineTrace(FHitResult& OutHitResult, float Trac
 
 	OutHitResult = FHitResult();
 	return false;
+}
+
+void AThrowWeponCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	// Health 変数をネットワーク同期対象として登録
+	DOREPLIFETIME(AThrowWeponCharacter, Health);
 }

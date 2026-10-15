@@ -84,12 +84,20 @@ public:
 	virtual void DoJumpEnd();
 
 	// --- HPステータス ---
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
+	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
+	//float Health = 100.0f;
+
+	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
+	//float MaxHealth = 100.0f;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Health")
 	float Health = 100.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
 	float MaxHealth = 100.0f;
 
+	// Replicationに必要な宣言
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	// --- ダメージ処理 ---
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 
