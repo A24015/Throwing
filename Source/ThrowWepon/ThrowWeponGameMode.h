@@ -43,6 +43,7 @@ private:
 	void HideStartText();
 
 	
-
+	// ƒŠƒUƒ‹ƒgˆ—‚ğs‚¤ŠÖ”
+	void CreateResult();
 	
 };

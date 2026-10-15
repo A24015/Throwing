@@ -1,3 +1,6 @@
+// このヘッダーファイルが何度も読み込まれるのを防ぐ
+#pragma once
+
 // Unreal Engineの基本機能を使うためのもの
 #include "CoreMinimal.h"
 
@@ -38,6 +41,10 @@ public:
 	// プレイヤーの名前を保存する変数
 	UPROPERTY(Replicated, BlueprintReadOnly)
 	FString PlayerName;
+
+	// キル数から死亡回数を引いたスコアを取得する処理
+	UFUNCTION(BlueprintPure)
+	int32 GetResultScore() const;
 
 	// プレイヤーの名前を設定する処理
 	void SetPlayerName(const FString& NewName);

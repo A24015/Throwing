@@ -47,3 +47,10 @@ void AThrowWeponPlayerState::SetPlayerName(const FString& NewName)
 	// 受け取った名前をPlayerName変数に保存する
 	PlayerName = NewName;
 }
+
+// キル数から死亡回数を引いたスコアを取得する処理
+int32 AThrowWeponPlayerState::GetResultScore() const
+{
+	// キル数から死亡回数を引いた値を返す
+	return KillCount - DeathCount;
+}

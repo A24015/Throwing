@@ -9,6 +9,8 @@
 
 // プレイヤーキャラクターを使うためのもの
 #include "ThrowWeponCharacter.h"
+// プレイヤーの一覧を取得するためのもの
+#include "GameFramework/GameStateBase.h"
 
 AThrowWeponGameMode::AThrowWeponGameMode()
 {
@@ -183,5 +185,36 @@ void AThrowWeponGameMode::RespawnPlayer(AController* PlayerController)
 	{
 		// Controllerを新しいCharacterに接続する
 		PlayerController->Possess(NewCharacter);
+	}
+}
+
+// リザルト処理を行う関数
+void AThrowWeponGameMode::CreateResult()
+{
+	// 全プレイヤーのPlayerStateを保存する配列
+	TArray<AThrowWeponPlayerState*> PlayerStates;
+
+	// 現在のGameStateを取得する
+	AGameStateBase* CurrentGameState =
+		GetGameState<AGameStateBase>();
+
+	// GameStateが取得できなかった場合は終了する
+	if (!CurrentGameState)
+	{
+		return;
+	}
+
+	// 全プレイヤーのPlayerStateを1人ずつ取得する
+	for (APlayerState* PlayerState : CurrentGameState->PlayerArray)
+	{
+		// 自分で作ったPlayerStateに変換する
+		AThrowWeponPlayerState* ThrowPlayerState =
+			Cast<AThrowWeponPlayerState>(PlayerState);
+
+		// 変換できたPlayerStateだけ配列に追加する
+		if (ThrowPlayerState)
+		{
+			PlayerStates.Add(ThrowPlayerState);
+		}
 	}
 }
