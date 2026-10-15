@@ -125,4 +125,11 @@ public:
 	// このキャラクターがすでに死亡処理をしたか保存する変数
 	UPROPERTY()
 	bool bIsDead;
+
+	// --- 追記：最後に攻撃してきたコントローラーを記憶する変数 ---
+	UPROPERTY()
+	TObjectPtr<AController> LastInstigator;
+
+	// --- 追記：場外（KillZ）に落ちた時の処理 ---
+	virtual void FellOutOfWorld(const class UDamageType& dmgType) override;
 };

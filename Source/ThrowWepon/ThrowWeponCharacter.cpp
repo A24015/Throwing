@@ -7,6 +7,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
+#include "Engine/DamageEvents.h" // 
 #include "DrawDebugHelpers.h"
 #include "EnhancedInputComponent.h"
 #include "InputActionValue.h"
@@ -143,6 +144,12 @@ float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& D
 
 	if (ActualDamage > 0.0f)
 	{
+		// ★追記：自分以外の攻撃者であれば、最後に攻撃した人として記憶する
+		if (EventInstigator && EventInstigator != GetController())
+		{
+			LastInstigator = EventInstigator;
+		}
+
 		Health = FMath::Clamp(Health - ActualDamage, 0.0f, MaxHealth);
 
 		// --- 1. 被弾方向の計算 ---
@@ -293,4 +300,19 @@ void AThrowWeponCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 
 	// Health 変数をネットワーク同期対象として登録
 	DOREPLIFETIME(AThrowWeponCharacter, Health);
+}
+
+void AThrowWeponCharacter::FellOutOfWorld(const UDamageType& dmgType)
+{
+	// サーバー側かつ、まだ生存している場合のみ実行
+	if (HasAuthority() && !bIsDead)
+	{
+		// 残りHP分のダメージを与え、最後に攻撃した人（LastInstigator）を犯人として TakeDamage に渡す
+		FDamageEvent DamageEvent;
+		TakeDamage(Health > 0.0f ? Health : 100.0f, DamageEvent, LastInstigator, nullptr);
+	}
+	else
+	{
+		Super::FellOutOfWorld(dmgType);
+	}
 }
