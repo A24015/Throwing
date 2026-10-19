@@ -32,10 +32,18 @@ void AThrowWeponGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 1. 武器を初期スポーン
-	SpawnWeaponWithTags();
+	// 現在のマップ名を取得
+	FString CurrentMapName = GetWorld()->GetMapName();
 
-	// 2. カウントダウンを開始
+	// ★ メインメニュー（Lvl_MainMenu）やロビー（Lvl_Lobby）にいる場合は、戦闘処理を実行せずに終了する
+	if (CurrentMapName.Contains(TEXT("Lvl_MainMenu")) || CurrentMapName.Contains(TEXT("Lvl_Lobby")))
+	{
+		return;
+	}
+
+	// -------------------------------------------------------------
+	// ↓ ここから下は本番ステージ（Lvl_Stage1）だけで実行される
+	// -------------------------------------------------------------
 	if (!GetWorldTimerManager().IsTimerActive(CountdownTimerHandle))
 	{
 		GetWorldTimerManager().SetTimer(
