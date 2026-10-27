@@ -7,6 +7,8 @@
 // PlayerStartを使うためのもの
 #include "GameFramework/PlayerStart.h"
 
+
+
 // プレイヤーキャラクターを使うためのもの
 #include "ThrowWeponCharacter.h"
 // プレイヤーの一覧を取得するためのもの
@@ -31,6 +33,40 @@ AThrowWeponGameMode::AThrowWeponGameMode()
 void AThrowWeponGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// 実際に動いている GameMode と、生成対象のクラスを確認
+	UE_LOG(
+		LogTemp,
+		Error,
+		TEXT("実行中GameMode: %s"),
+		*GetClass()->GetPathName()
+	);
+
+	UE_LOG(
+		LogTemp,
+		Error,
+		TEXT("DefaultPawnClass: %s"),
+		*GetNameSafe(DefaultPawnClass.Get())
+	);
+
+	if (DefaultPawnClass)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("DefaultPawnClassが抽象クラスか: %s"),
+			DefaultPawnClass->HasAnyClassFlags(CLASS_Abstract)
+			? TEXT("YES")
+			: TEXT("NO")
+		);
+	}
+
+	UE_LOG(
+		LogTemp,
+		Error,
+		TEXT("CharacterClass: %s"),
+		*GetNameSafe(CharacterClass.Get())
+	);
 
 	// 現在のマップ名を取得
 	FString CurrentMapName = GetWorld()->GetMapName();
@@ -179,72 +215,19 @@ void AThrowWeponGameMode::HideStartText()
 // 死亡したプレイヤーをリスポーンさせる処理
 void AThrowWeponGameMode::RespawnPlayer(AController* PlayerController)
 {
-	if (!PlayerController)
+	if (!IsValid(PlayerController))
 	{
 		return;
 	}
 
-	AThrowWeponCharacter* OldCharacter =
-		Cast<AThrowWeponCharacter>(PlayerController->GetPawn());
-
-	AActor* RespawnPoint = nullptr;
-
-	for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+	if (APawn* OldPawn = PlayerController->GetPawn())
 	{
-		RespawnPoint = *It;
-		break;
+		PlayerController->UnPossess();
+		OldPawn->Destroy();
 	}
 
-	if (!RespawnPoint)
-	{
-		return;
-	}
-
-	if (OldCharacter)
-	{
-		OldCharacter->Destroy();
-	}
-
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = PlayerController;
-
-	AThrowWeponCharacter* NewCharacter =
-		GetWorld()->SpawnActor<AThrowWeponCharacter>(
-			AThrowWeponCharacter::StaticClass(),
-			RespawnPoint->GetActorLocation(),
-			RespawnPoint->GetActorRotation(),
-			SpawnParams
-		);
-
-	if (NewCharacter)
-	{
-		PlayerController->Possess(NewCharacter);
-	}
-}
-
-// リザルト処理を行う関数
-void AThrowWeponGameMode::CreateResult()
-{
-	TArray<AThrowWeponPlayerState*> PlayerStates;
-
-	AGameStateBase* CurrentGameState =
-		GetGameState<AGameStateBase>();
-
-	if (!CurrentGameState)
-	{
-		return;
-	}
-
-	for (APlayerState* PlayerState : CurrentGameState->PlayerArray)
-	{
-		AThrowWeponPlayerState* ThrowPlayerState =
-			Cast<AThrowWeponPlayerState>(PlayerState);
-
-		if (ThrowPlayerState)
-		{
-			PlayerStates.Add(ThrowPlayerState);
-		}
-	}
+	// UE標準の方法でプレイヤーを復活させる
+	RestartPlayer(PlayerController);
 }
 
 void AThrowWeponGameMode::SpawnWeaponWithTags()

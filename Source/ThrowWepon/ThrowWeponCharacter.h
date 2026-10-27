@@ -49,6 +49,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> MouseLookAction;
 
+	// 自分を死亡させる入力アクション
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
+	UInputAction* DeathAction;
+
 public:
 
 	/** Constructor */
@@ -132,4 +136,7 @@ public:
 
 	// --- 追記：場外（KillZ）に落ちた時の処理 ---
 	virtual void FellOutOfWorld(const class UDamageType& dmgType) override;
+	void DieByButton();
+
+	
 };

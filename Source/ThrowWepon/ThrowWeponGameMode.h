@@ -4,6 +4,8 @@
 #include "GameFramework/GameModeBase.h"
 #include "ThrowWeponGameMode.generated.h"
 
+class AThrowWeponCharacter;
+
 UCLASS()
 class THROWWEPON_API AThrowWeponGameMode : public AGameModeBase
 {
@@ -35,16 +37,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Game Rules")
 	void StartMatch();
 
-protected:
-
-	virtual void PostLogin(APlayerController* NewPlayer) override;
-
-	// プレイヤーの初期出現位置を決定するUE標準関数のオーバーライド
-	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
-
-	virtual void BeginPlay() override;
-private:
-
 	FVector PlayerSpawnLocations[4];
 
 	int32 PlayerCount;
@@ -65,11 +57,26 @@ private:
 
 	void HideStartText();
 
-	
+
 	// リザルト処理を行う関数
 	void CreateResult();
-	
+
 	// すでに使われた PlayerStart を記録しておく配列
 	UPROPERTY()
 	TArray<AActor*> UsedPlayerStarts;
+	// これはリスポーン時に生成するCharacterのクラス
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Respawn")
+	TSubclassOf<AThrowWeponCharacter> CharacterClass;
+
+protected:
+
+	virtual void PostLogin(APlayerController* NewPlayer) override;
+
+	// プレイヤーの初期出現位置を決定するUE標準関数のオーバーライド
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+
+	virtual void BeginPlay() override;
+private:
+
+	
 };

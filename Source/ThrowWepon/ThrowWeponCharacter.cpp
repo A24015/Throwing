@@ -49,6 +49,8 @@ AThrowWeponCharacter::AThrowWeponCharacter()
 // ---------------------------------------------------------
 void AThrowWeponCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
+	
+
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
@@ -73,7 +75,15 @@ void AThrowWeponCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		{
 			EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AThrowWeponCharacter::Look);
 		}
+		
 	}
+	// Kキーを押したら死亡処理を実行する
+	PlayerInputComponent->BindKey(
+		EKeys::K,
+		IE_Pressed,
+		this,
+		&AThrowWeponCharacter::DieByButton
+	);
 }
 
 void AThrowWeponCharacter::Move(const FInputActionValue& Value)
@@ -142,6 +152,12 @@ float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& D
 {
 	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
+
+	// TakeDamageが呼ばれたことを確認する
+	UE_LOG(LogTemp, Warning, TEXT("★★★ TakeDamage呼ばれた ★★★"));
+
+	// ダメージ量を確認する
+	UE_LOG(LogTemp, Warning, TEXT("Damage = %f / HP = %f"), DamageAmount, Health);
 	if (ActualDamage > 0.0f)
 	{
 		// ★追記：自分以外の攻撃者であれば、最後に攻撃した人として記憶する
@@ -224,17 +240,23 @@ float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& D
 					// 3秒後にリスポーン処理を実行する
 					FTimerHandle RespawnTimer;
 
-					// タイマーにリスポーン処理を登録する
-					GetWorldTimerManager().SetTimer(
-						RespawnTimer,
-						[ThrowGameMode, PlayerController]()
-						{
-							// 指定したプレイヤーをリスポーンさせる
-							ThrowGameMode->RespawnPlayer(PlayerController);
-						},
-						3.0f,
-						false
-					);
+					// ワールド側にリスポーンタイマーを登録する
+					if (UWorld* World = GetWorld())
+					{
+						World->GetTimerManager().SetTimer(
+							RespawnTimer,
+							[ThrowGameMode, PlayerController]()
+							{
+								if (IsValid(ThrowGameMode) && IsValid(PlayerController))
+								{
+									ThrowGameMode->RespawnPlayer(PlayerController);
+								}
+							},
+							3.0f,
+							false
+						);
+					}
+					
 				}
 			}
 		}
@@ -304,15 +326,32 @@ void AThrowWeponCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 
 void AThrowWeponCharacter::FellOutOfWorld(const UDamageType& dmgType)
 {
-	// サーバー側かつ、まだ生存している場合のみ実行
+	// サーバー側で、生存中の場合は死亡処理を実行
 	if (HasAuthority() && !bIsDead)
 	{
-		// 残りHP分のダメージを与え、最後に攻撃した人（LastInstigator）を犯人として TakeDamage に渡す
 		FDamageEvent DamageEvent;
-		TakeDamage(Health > 0.0f ? Health : 100.0f, DamageEvent, LastInstigator, nullptr);
+
+		TakeDamage(
+			Health > 0.0f ? Health : 100.0f,
+			DamageEvent,
+			LastInstigator,
+			nullptr
+		);
 	}
-	else
-	{
-		Super::FellOutOfWorld(dmgType);
-	}
+
+	// Super::FellOutOfWorld() は呼び出さない
+}
+// Kキーで自分にダメージを与える処理
+void AThrowWeponCharacter::DieByButton()
+{
+	// HPを直接表示する
+	UE_LOG(LogTemp, Warning, TEXT("K入力：現在HP = %f"), Health);
+
+	// 現在のHPより大きいダメージを与える
+	TakeDamage(
+		Health + 1.0f,
+		FDamageEvent(),
+		GetController(),
+		this
+	);
 }
