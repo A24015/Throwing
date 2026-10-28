@@ -427,6 +427,12 @@ void AThrowWeponGameMode::CreateResult()
 		// プレイヤー名
 		NewResult.PlayerName = Players[i]->PlayerName;
 
+		// キル数
+		NewResult.KillCount = Players[i]->KillCount;
+
+		// デス数
+		NewResult.DeathCount = Players[i]->DeathCount;
+
 		// スコア
 		NewResult.Score = Players[i]->GetResultScore();
 

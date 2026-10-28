@@ -23,6 +23,14 @@ struct FResultData
 	// スコア
 	UPROPERTY(BlueprintReadWrite)
 	int32 Score = 0;
+
+	// キル数
+	UPROPERTY(BlueprintReadWrite)
+	int32 KillCount = 0;
+
+	// デス数
+	UPROPERTY(BlueprintReadWrite)
+	int32 DeathCount = 0;
 };
 
 UCLASS()
