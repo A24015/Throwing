@@ -82,7 +82,7 @@ public:
 
 
 	// リザルト処理を行う関数
-	UFUNCTION(BlueprintImplementableEvent)
+	UFUNCTION(BlueprintCallable, Category = "Result")
 	void CreateResult();
 
 	// すでに使われた PlayerStart を記録しておく配列

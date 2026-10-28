@@ -39,8 +39,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Game")
 	void EndMatch();
 	// ‡I—¹ó‘Ô‚ğ•Û‘¶‚·‚é•Ï”
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game")
-	bool bGameEnded = false;
+	
 
 	// ƒLƒ‹”‚ğ•Û‘¶‚·‚é•Ï”
 	UPROPERTY(Replicated, BlueprintReadOnly)

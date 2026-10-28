@@ -54,11 +54,6 @@ public:
 		TArray<FLifetimeProperty>& OutLifetimeProps
 	) const override;
 
-	// ‡I—¹ó‘Ô‚ğ•Û‘¶‚·‚é•Ï”
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game")
-	bool bGameEnded = false;
+	
 
-	// ‡I—¹ˆ—
-	UFUNCTION(BlueprintCallable, Category = "Game")
-	void EndMatch();
 };
