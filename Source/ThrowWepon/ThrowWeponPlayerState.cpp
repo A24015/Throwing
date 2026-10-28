@@ -4,6 +4,8 @@
 // Replicatedをネットワーク同期させるためのもの
 #include "Net/UnrealNetwork.h"
 
+
+
 // PlayerStateが作られたときに呼ばれる処理
 AThrowWeponPlayerState::AThrowWeponPlayerState()
 {
@@ -39,6 +41,8 @@ void AThrowWeponPlayerState::GetLifetimeReplicatedProps(
 	DOREPLIFETIME(AThrowWeponPlayerState, KillCount);
 	// PlayerNameをネットワーク同期する
 	DOREPLIFETIME(AThrowWeponPlayerState, PlayerName);
+
+	
 }
 
 // プレイヤーの名前を設定する処理

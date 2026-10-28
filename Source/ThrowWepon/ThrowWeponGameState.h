@@ -31,6 +31,17 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly)
 	bool bShowStart;
 
+	// 試合終了状態を保存する変数
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game")
+	bool bGameEnded = false;
+
+	// 試合終了処理
+	UFUNCTION(BlueprintCallable, Category = "Game")
+	void EndMatch();
+	// 試合終了状態を保存する変数
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game")
+	bool bGameEnded = false;
+
 	// キル数を保存する変数
 	UPROPERTY(Replicated, BlueprintReadOnly)
 	int32 KillCount;

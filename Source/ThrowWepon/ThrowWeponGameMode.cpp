@@ -6,7 +6,7 @@
 #include "Kismet/GameplayStatics.h"
 // PlayerStartを使うためのもの
 #include "GameFramework/PlayerStart.h"
-
+#include "UObject/ConstructorHelpers.h"
 
 
 // プレイヤーキャラクターを使うためのもの
@@ -23,12 +23,20 @@ AThrowWeponGameMode::AThrowWeponGameMode()
 
 	PlayerCount = 0;
 
-	// 使用するGameStateを指定
 	GameStateClass = AThrowWeponGameState::StaticClass();
-	// このゲームで使うPlayerStateを指定する
 	PlayerStateClass = AThrowWeponPlayerState::StaticClass();
-}
 
+	// リスポーンに使うキャラクターのBlueprintを読み込む
+	static ConstructorHelpers::FClassFinder<APawn> PlayerPawnBPClass(
+		TEXT("/Game/ThirdPerson/Blueprints/BP_ThirdPersonCharacter")
+	);
+
+	if (PlayerPawnBPClass.Class)
+	{
+		// 生成するキャラクターをBP_ThirdPersonCharacterに指定
+		DefaultPawnClass = PlayerPawnBPClass.Class;
+	}
+}
 
 void AThrowWeponGameMode::BeginPlay()
 {
@@ -158,6 +166,7 @@ void AThrowWeponGameMode::UpdateCountdown()
 
 void AThrowWeponGameMode::UpdateGameTime()
 {
+	// 試合の状態を管理するGameStateを取得
 	AThrowWeponGameState* ThrowGameState =
 		GetGameState<AThrowWeponGameState>();
 
@@ -166,19 +175,32 @@ void AThrowWeponGameMode::UpdateGameTime()
 		return;
 	}
 
+	// 試合がすでに終了していたら何もしない
+	if (ThrowGameState->bGameEnded)
+	{
+		GetWorldTimerManager().ClearTimer(GameTimerHandle);
+		return;
+	}
+
+	// 残り時間を1秒減らす
 	ThrowGameState->RemainingTime--;
 
+	// 残り時間が0以下になったら試合終了
 	if (ThrowGameState->RemainingTime <= 0)
 	{
+		// 残り時間を0に固定
 		ThrowGameState->RemainingTime = 0;
 
-		// 3分経過
+		// 3分タイマーを停止
 		GetWorldTimerManager().ClearTimer(GameTimerHandle);
 
-		// ここにゲーム終了処理を入れる
+		// 試合終了処理を呼び出す
+		ThrowGameState->EndMatch();
+
+		// 順位を計算
+		CreateResult();
 	}
 }
-
 void AThrowWeponGameMode::HideStartText()
 {
 	AThrowWeponGameState* ThrowGameState =
@@ -348,4 +370,67 @@ AActor* AThrowWeponGameMode::ChoosePlayerStart_Implementation(AController* Playe
 
 	// もし人数が PlayerStart の数を超えて使い切った場合は、通常のランダム処理（親クラス）にフォールバック
 	return Super::ChoosePlayerStart_Implementation(Player);
+}
+
+void AThrowWeponGameMode::CreateResult()
+{
+	// サーバーだけが順位を計算する
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	// GameStateを取得
+	AThrowWeponGameState* ThrowGameState =
+		GetGameState<AThrowWeponGameState>();
+
+	if (!ThrowGameState)
+	{
+		return;
+	}
+
+	// 前回のリザルトを削除
+	ResultData.Empty();
+
+	// PlayerStateを入れる配列
+	TArray<AThrowWeponPlayerState*> Players;
+
+	// 全プレイヤーを取得
+	for (APlayerState* BasePlayerState : ThrowGameState->PlayerArray)
+	{
+		AThrowWeponPlayerState* PlayerState =
+			Cast<AThrowWeponPlayerState>(BasePlayerState);
+
+		if (PlayerState)
+		{
+			Players.Add(PlayerState);
+		}
+	}
+
+	// スコアが高い順に並べる
+	Players.Sort(
+		[](const AThrowWeponPlayerState& A,
+			const AThrowWeponPlayerState& B)
+		{
+			return A.GetResultScore() > B.GetResultScore();
+		}
+	);
+
+	// 順位を作る
+	for (int32 i = 0; i < Players.Num(); ++i)
+	{
+		FResultData NewResult;
+
+		// 順位
+		NewResult.Rank = i + 1;
+
+		// プレイヤー名
+		NewResult.PlayerName = Players[i]->PlayerName;
+
+		// スコア
+		NewResult.Score = Players[i]->GetResultScore();
+
+		// リザルト配列に追加
+		ResultData.Add(NewResult);
+	}
 }

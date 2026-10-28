@@ -35,4 +35,30 @@ void AThrowWeponGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME(AThrowWeponGameState, RemainingTime);
 	DOREPLIFETIME(AThrowWeponGameState, bGameStarted);
 	DOREPLIFETIME(AThrowWeponGameState, bShowStart);
+	// 試合終了状態を全プレイヤーに同期する
+	DOREPLIFETIME(AThrowWeponGameState, bGameEnded);
+}
+
+void AThrowWeponGameState::EndMatch()
+{
+    // サーバー側だけで実行する
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    // すでに試合が終わっていたら何もしない
+    if (bGameEnded)
+    {
+        return;
+    }
+
+    // 試合終了にする
+    bGameEnded = true;
+
+    // 試合中ではない状態にする
+    bGameStarted = false;
+
+    // 残り時間を0にする
+    RemainingTime = 0;
 }

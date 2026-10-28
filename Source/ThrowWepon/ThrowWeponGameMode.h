@@ -6,6 +6,25 @@
 
 class AThrowWeponCharacter;
 
+// リザルトに表示する1人分の情報
+USTRUCT(BlueprintType)
+struct FResultData
+{
+	GENERATED_BODY()
+
+	// 順位
+	UPROPERTY(BlueprintReadWrite)
+	int32 Rank = 0;
+
+	// プレイヤー名
+	UPROPERTY(BlueprintReadWrite)
+	FString PlayerName;
+
+	// スコア
+	UPROPERTY(BlueprintReadWrite)
+	int32 Score = 0;
+};
+
 UCLASS()
 class THROWWEPON_API AThrowWeponGameMode : public AGameModeBase
 {
@@ -37,6 +56,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Game Rules")
 	void StartMatch();
 
+	// 全プレイヤーのリザルト情報
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FResultData> ResultData;
+
 	FVector PlayerSpawnLocations[4];
 
 	int32 PlayerCount;
@@ -59,6 +82,7 @@ public:
 
 
 	// リザルト処理を行う関数
+	UFUNCTION(BlueprintImplementableEvent)
 	void CreateResult();
 
 	// すでに使われた PlayerStart を記録しておく配列
@@ -67,6 +91,9 @@ public:
 	// これはリスポーン時に生成するCharacterのクラス
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Respawn")
 	TSubclassOf<AThrowWeponCharacter> CharacterClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Respawn")
+	TSubclassOf<APawn> RespawnCharacterClass;
 
 protected:
 
