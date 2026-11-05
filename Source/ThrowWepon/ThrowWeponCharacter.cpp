@@ -152,15 +152,11 @@ float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& D
 {
 	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
-
-	// TakeDamageが呼ばれたことを確認する
 	UE_LOG(LogTemp, Warning, TEXT("★★★ TakeDamage呼ばれた ★★★"));
-
-	// ダメージ量を確認する
 	UE_LOG(LogTemp, Warning, TEXT("Damage = %f / HP = %f"), DamageAmount, Health);
+
 	if (ActualDamage > 0.0f)
 	{
-		// ★追記：自分以外の攻撃者であれば、最後に攻撃した人として記憶する
 		if (EventInstigator && EventInstigator != GetController())
 		{
 			LastInstigator = EventInstigator;
@@ -168,79 +164,72 @@ float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& D
 
 		Health = FMath::Clamp(Health - ActualDamage, 0.0f, MaxHealth);
 
-		// --- 1. 被弾方向の計算 ---
-		FVector HitDirection = GetActorForwardVector() * -1.0f; // 基本は後ろ方向
+		// 1. 被弾方向の計算
+		FVector HitDirection = GetActorForwardVector() * -1.0f;
 		if (DamageCauser)
 		{
-			// ボール（DamageCauser）から被弾者へのベクトル（吹き飛び方向）
 			HitDirection = (GetActorLocation() - DamageCauser->GetActorLocation()).GetSafeNormal();
 		}
 
-		// --- 2. 慣性のリセット（ヒットストップ効果） ---
+		// 2. 慣性のリセット
 		if (GetCharacterMovement())
 		{
 			GetCharacterMovement()->StopMovementImmediately();
 		}
 
-		// --- 3. 生存 / 死亡によるノックバックの分岐 ---
+		// 3. アイテムからノックバック基本値の取得
+		float BaseKnockback = 800.0f;
+		if (DamageCauser)
+		{
+			if (FProperty* Prop = DamageCauser->GetClass()->FindPropertyByName(TEXT("KnockbackForce")))
+			{
+				if (FNumericProperty* NumProp = CastField<FNumericProperty>(Prop))
+				{
+					// DamageCauser(Actor) の中から KnockbackForce の正確なメモリ位置を取得
+					void* ValuePtr = NumProp->ContainerPtrToValuePtr<void>(DamageCauser);
+					BaseKnockback = static_cast<float>(NumProp->GetFloatingPointPropertyValue(ValuePtr));
+				}
+			}
+		}
+
+		// 確認用ログ
+		UE_LOG(LogTemp, Warning, TEXT("[Knockback Fix] DamageCauser: %s | BaseKnockback: %f"),
+			DamageCauser ? *DamageCauser->GetName() : TEXT("NULL"), BaseKnockback);
+
+		// 4. 生存 / 死亡によるノックバックと処理の分岐
 		if (Health <= 0.0f)
 		{
-			// まだ死亡処理をしていないか確認する
 			if (!bIsDead)
 			{
-				// 死亡済みの状態にする
 				bIsDead = true;
 
-				// 自分のPlayerStateを取得する
-				AThrowWeponPlayerState* ThrowPlayerState =
-					GetPlayerState<AThrowWeponPlayerState>();
+				AThrowWeponPlayerState* ThrowPlayerState = GetPlayerState<AThrowWeponPlayerState>();
+				AThrowWeponGameMode* ThrowGameMode = GetWorld()->GetAuthGameMode<AThrowWeponGameMode>();
 
-				// このゲームで使っているGameModeを取得する
-				AThrowWeponGameMode* ThrowGameMode =
-					GetWorld()->GetAuthGameMode<AThrowWeponGameMode>();
-
-				// PlayerStateを取得できたか確認する
 				if (ThrowPlayerState)
 				{
-					// 死亡回数を1増やす
 					ThrowPlayerState->AddDeath();
 				}
 
-				// 攻撃したプレイヤーが存在するか確認する
 				if (EventInstigator)
 				{
-					// 攻撃したプレイヤーのPlayerStateを取得する
-					AThrowWeponPlayerState* AttackerPlayerState =
-						EventInstigator->GetPlayerState<AThrowWeponPlayerState>();
-
-					// 攻撃したプレイヤーのPlayerStateを取得できたか確認する
+					AThrowWeponPlayerState* AttackerPlayerState = EventInstigator->GetPlayerState<AThrowWeponPlayerState>();
 					if (AttackerPlayerState)
 					{
-						// キル数を1増やす
 						AttackerPlayerState->AddKill();
 					}
 				}
 
-				// 死亡時のノックバックを計算する
-				FVector FatalKnockback =
-					(HitDirection + FVector(0.f, 0.f, 0.6f)).GetSafeNormal() * 4500.0f;
+				float FatalMultiplier = 4.5f;
+				FVector FatalKnockback = (HitDirection + FVector(0.f, 0.f, 0.6f)).GetSafeNormal() * (BaseKnockback * FatalMultiplier);
 
-				// キャラクターを吹き飛ばす
 				LaunchCharacter(FatalKnockback, true, true);
-
-				// 全端末に死亡処理を通知する
 				Multicast_OnDeath();
 
-				// 自分を操作しているプレイヤーのControllerを取得する
 				AController* PlayerController = GetController();
-
-				// Controllerが存在するか確認する
 				if (PlayerController)
 				{
-					// 3秒後にリスポーン処理を実行する
 					FTimerHandle RespawnTimer;
-
-					// ワールド側にリスポーンタイマーを登録する
 					if (UWorld* World = GetWorld())
 					{
 						World->GetTimerManager().SetTimer(
@@ -256,17 +245,16 @@ float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& D
 							false
 						);
 					}
-					
 				}
 			}
 		}
 		else
 		{
-			// 【通常被弾時】：軽めの通常ノックバック（800.0f）
-			FVector KnockbackVelocity = (HitDirection + FVector(0.f, 0.f, 0.35f)).GetSafeNormal() * 800.0f;
+			FVector KnockbackVelocity = (HitDirection + FVector(0.f, 0.f, 0.35f)).GetSafeNormal() * BaseKnockback;
 			LaunchCharacter(KnockbackVelocity, true, true);
 		}
 	}
+
 	return ActualDamage;
 }
 // ---------------------------------------------------------
