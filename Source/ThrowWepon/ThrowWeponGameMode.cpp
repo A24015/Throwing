@@ -1,4 +1,5 @@
 #include "ThrowWeponGameMode.h"
+#include "ThrowWeponGameInstance.h"
 #include "ThrowWeponGameState.h"
 #include "ThrowWeponPlayerState.h"
 // PlayerStartを探すためのもの
@@ -199,6 +200,12 @@ void AThrowWeponGameMode::UpdateGameTime()
 
 		// 順位を計算
 		CreateResult();
+
+		// リザルトレベルへ移動する
+		if (UWorld* World = GetWorld())
+		{
+			World->ServerTravel(TEXT("/Game/UI/RizaltLevel?listen"));
+		}
 	}
 }
 void AThrowWeponGameMode::HideStartText()
@@ -438,5 +445,16 @@ void AThrowWeponGameMode::CreateResult()
 
 		// リザルト配列に追加
 		ResultData.Add(NewResult);
+	}
+
+	// GameInstanceを取得する
+	UThrowWeponGameInstance* GameInstance =
+		Cast<UThrowWeponGameInstance>(GetGameInstance());
+
+	// GameInstanceが取得できた場合
+	if (GameInstance)
+	{
+		// GameModeの試合結果をGameInstanceにコピーする
+		GameInstance->ResultData = ResultData;
 	}
 }
