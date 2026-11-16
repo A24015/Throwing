@@ -1,17 +1,18 @@
+
 #include "ThrowWeponCharacter.h"
-#include"ThrowWeponGameState.h"
-#include"ThrowWeponGameMode.h"
+#include "ThrowWeponGameState.h"
+#include "ThrowWeponGameMode.h"
 #include "ThrowWeponPlayerState.h"
 #include "Camera/CameraComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
-#include "Engine/DamageEvents.h" // 
+#include "Engine/DamageEvents.h"
 #include "DrawDebugHelpers.h"
 #include "EnhancedInputComponent.h"
 #include "InputActionValue.h"
-#include "GameFramework/CharacterMovementComponent.h" // ノックバック同期用
+#include "GameFramework/CharacterMovementComponent.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -39,9 +40,12 @@ AThrowWeponCharacter::AThrowWeponCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
 
+	GetCharacterMovement()->AirControl = 0.2f;                 // 空中で踏ん張りすぎない
+	GetCharacterMovement()->BrakingDecelerationFalling = 0.0f; // 吹っ飛んだ勢いが空中で減衰しないようにする
+
 	// 最初は生きている状態にする
 	bIsDead = false;
-	Health = MaxHealth; 
+	Health = MaxHealth;
 }
 
 // ---------------------------------------------------------
@@ -49,8 +53,6 @@ AThrowWeponCharacter::AThrowWeponCharacter()
 // ---------------------------------------------------------
 void AThrowWeponCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
-	
-
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
@@ -75,8 +77,8 @@ void AThrowWeponCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		{
 			EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AThrowWeponCharacter::Look);
 		}
-		
 	}
+
 	// Kキーを押したら死亡処理を実行する
 	PlayerInputComponent->BindKey(
 		EKeys::K,
@@ -133,16 +135,20 @@ void AThrowWeponCharacter::DoJumpEnd()
 }
 
 // ---------------------------------------------------------
-// ダメージ & ノックバック処理
+// 死亡時のマルチキャスト処理
 // ---------------------------------------------------------
-
 void AThrowWeponCharacter::Multicast_OnDeath_Implementation()
 {
-	// 死亡したので入力を無効化（操作不能にする）
-	DisableInput(Cast<APlayerController>(GetController()));
-
-	// ※以前のラグドール化処理（SetSimulatePhysicsなど）は完全にカットし、
-	// CharacterMovement による綺麗な同期状態を維持します
+	// 人間プレイヤーなら入力を無効化
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		DisableInput(PC);
+	}
+	// AI（敵Bot）なら移動を停止
+	else if (GetCharacterMovement())
+	{
+		GetCharacterMovement()->DisableMovement();
+	}
 }
 
 // ---------------------------------------------------------
@@ -171,8 +177,8 @@ float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& D
 			HitDirection = (GetActorLocation() - DamageCauser->GetActorLocation()).GetSafeNormal();
 		}
 
-		// 2. 慣性のリセット
-		if (GetCharacterMovement())
+		// 2. 慣性のリセット（奈落落下の時は落下速度を止めない）
+		if (DamageCauser && GetCharacterMovement())
 		{
 			GetCharacterMovement()->StopMovementImmediately();
 		}
@@ -185,16 +191,20 @@ float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& D
 			{
 				if (FNumericProperty* NumProp = CastField<FNumericProperty>(Prop))
 				{
-					// DamageCauser(Actor) の中から KnockbackForce の正確なメモリ位置を取得
 					void* ValuePtr = NumProp->ContainerPtrToValuePtr<void>(DamageCauser);
 					BaseKnockback = static_cast<float>(NumProp->GetFloatingPointPropertyValue(ValuePtr));
 				}
 			}
 		}
 
-		// 確認用ログ
 		UE_LOG(LogTemp, Warning, TEXT("[Knockback Fix] DamageCauser: %s | BaseKnockback: %f"),
 			DamageCauser ? *DamageCauser->GetName() : TEXT("NULL"), BaseKnockback);
+
+		// プレイヤー操作以外のキャラ（敵Bot）は吹っ飛び3倍
+		if (!IsPlayerControlled())
+		{
+			BaseKnockback *= 3.0f;
+		}
 
 		// 4. 生存 / 死亡によるノックバックと処理の分岐
 		if (Health <= 0.0f)
@@ -220,14 +230,21 @@ float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& D
 					}
 				}
 
-				float FatalMultiplier = 4.5f;
-				FVector FatalKnockback = (HitDirection + FVector(0.f, 0.f, 0.6f)).GetSafeNormal() * (BaseKnockback * FatalMultiplier);
+				LastInstigator = nullptr;
 
-				LaunchCharacter(FatalKnockback, true, true);
+				// 攻撃（DamageCauserあり）で死んだ時だけトドメの特大吹っ飛びを実行する
+				if (DamageCauser)
+				{
+					float FatalMultiplier = 4.5f;
+					FVector FatalKnockback = (HitDirection + FVector(0.f, 0.f, 0.6f)).GetSafeNormal() * (BaseKnockback * FatalMultiplier);
+
+					LaunchCharacter(FatalKnockback, true, true);
+				}
+
 				Multicast_OnDeath();
 
 				AController* PlayerController = GetController();
-				if (PlayerController)
+				if (PlayerController && IsPlayerControlled())
 				{
 					FTimerHandle RespawnTimer;
 					if (UWorld* World = GetWorld())
@@ -257,6 +274,7 @@ float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& D
 
 	return ActualDamage;
 }
+
 // ---------------------------------------------------------
 // ライン判定処理（コンバット）
 // ---------------------------------------------------------
@@ -326,20 +344,34 @@ void AThrowWeponCharacter::FellOutOfWorld(const UDamageType& dmgType)
 			nullptr
 		);
 	}
-
-	// Super::FellOutOfWorld() は呼び出さない
 }
+
 // Kキーで自分にダメージを与える処理
 void AThrowWeponCharacter::DieByButton()
 {
-	// HPを直接表示する
 	UE_LOG(LogTemp, Warning, TEXT("K入力：現在HP = %f"), Health);
 
-	// 現在のHPより大きいダメージを与える
 	TakeDamage(
 		Health + 1.0f,
 		FDamageEvent(),
 		GetController(),
 		this
 	);
+}
+
+void AThrowWeponCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	// サーバー側で生存中、かつ高さ(Z)が -1000.0f 以下になったら奈落即死
+	if (HasAuthority() && !bIsDead && GetActorLocation().Z < -1000.0f)
+	{
+		FDamageEvent DamageEvent;
+		TakeDamage(
+			Health > 0.0f ? Health : 100.0f,
+			DamageEvent,
+			LastInstigator,
+			nullptr
+		);
+	}
 }

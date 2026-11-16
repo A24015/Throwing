@@ -58,6 +58,7 @@ public:
 	/** Constructor */
 	AThrowWeponCharacter();
 
+	virtual void Tick(float DeltaTime) override;
 protected:
 
 	/** Initialize input action bindings */
