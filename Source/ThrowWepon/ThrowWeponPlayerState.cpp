@@ -48,8 +48,11 @@ void AThrowWeponPlayerState::GetLifetimeReplicatedProps(
 // プレイヤーの名前を設定する処理
 void AThrowWeponPlayerState::SetPlayerName(const FString& NewName)
 {
-	// 受け取った名前をPlayerName変数に保存する
+	// 独自のPlayerNameに保存
 	PlayerName = NewName;
+
+	// UE標準のプレイヤー名にも保存
+	Super::SetPlayerName(NewName);
 }
 
 // キル数から死亡回数を引いたスコアを取得する処理
