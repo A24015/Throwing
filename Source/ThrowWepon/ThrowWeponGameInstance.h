@@ -1,3 +1,5 @@
+#pragma once
+
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
 #include "ThrowWeponGameMode.h"
