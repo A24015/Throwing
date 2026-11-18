@@ -244,6 +244,12 @@ void AThrowWeponGameMode::HideStartText()
 // 死亡したプレイヤーをリスポーンさせる処理
 void AThrowWeponGameMode::RespawnPlayer(AController* PlayerController)
 {
+	// レベル移動中・終了処理中・ワールド無効時はリスポーンさせない
+	if (!IsValid(this) || !IsValid(GetWorld()) || GetWorld()->bIsTearingDown || !HasAuthority())
+	{
+		return;
+	}
+
 	if (!IsValid(PlayerController))
 	{
 		return;
