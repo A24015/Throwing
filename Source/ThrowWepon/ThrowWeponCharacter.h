@@ -121,6 +121,13 @@ public:
 
 public:
 
+	// プレイヤー名をサーバーに送る処理
+	UFUNCTION(Server, Reliable)
+	void ServerSetPlayerName(const FString& NewName);
+
+	// 名前を送信済みかどうかを確認する変数
+	bool bHasSentPlayerName = false;
+
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 

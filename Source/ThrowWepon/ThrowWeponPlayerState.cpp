@@ -61,3 +61,4 @@ int32 AThrowWeponPlayerState::GetResultScore() const
 	// ƒLƒ‹”‚©‚ç€–S‰ñ”‚ğˆø‚¢‚½’l‚ğ•Ô‚·
 	return KillCount - DeathCount;
 }
+

@@ -5,6 +5,16 @@
 #include "Net/UnrealNetwork.h"
 
 
+void AThrowWeponGameState::Multicast_ShowKillLog_Implementation(
+    const FString& KillerName,
+    const FString& VictimName)
+{
+    BP_OnKillLogReceived(KillerName, VictimName);
+}
+    
+
+
+
 AThrowWeponGameState::AThrowWeponGameState()
 {
 	Countdown = 3;
@@ -62,3 +72,4 @@ void AThrowWeponGameState::EndMatch()
     // Žc‚èŽžŠÔ‚ð0‚É‚·‚é
     RemainingTime = 0;
 }
+
