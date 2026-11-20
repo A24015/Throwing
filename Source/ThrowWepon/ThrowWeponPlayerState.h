@@ -26,6 +26,8 @@ public:
 
 	// €–S‰ñ”‚ğ•Û‘¶‚·‚é•Ï”
 	UPROPERTY(Replicated, BlueprintReadOnly)
+
+	
 	int32 DeathCount;
 
 	// €–S‰ñ”‚ğ1‘‚â‚·ˆ—

@@ -13,6 +13,7 @@
 #include "EnhancedInputComponent.h"
 #include "InputActionValue.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "ThrowWeponGameInstance.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -227,6 +228,29 @@ float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& D
 					if (AttackerPlayerState)
 					{
 						AttackerPlayerState->AddKill();
+
+						// 倒したプレイヤーのPlayerStateを取得
+						AThrowWeponPlayerState* KillerPS =
+							LastInstigator
+							? LastInstigator->GetPlayerState<AThrowWeponPlayerState>()
+							: nullptr;
+
+						// 倒されたプレイヤーのPlayerStateを取得
+						AThrowWeponPlayerState* VictimPS =
+							GetPlayerState<AThrowWeponPlayerState>();
+
+						// GameStateを取得
+						AThrowWeponGameState* ThrowGameState =
+							GetWorld()->GetGameState<AThrowWeponGameState>();
+
+						// 両方の名前が取得できたら全員に通知
+						if (KillerPS && VictimPS && ThrowGameState)
+						{
+							ThrowGameState->Multicast_ShowKillLog(
+								KillerPS->PlayerName,
+								VictimPS->PlayerName
+							);
+						}
 					}
 				}
 
@@ -363,6 +387,40 @@ void AThrowWeponCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	// 自分が操作しているキャラクターだけ処理する
+	if (IsLocallyControlled() && !bHasSentPlayerName)
+	{
+		// GameInstanceを取得する
+		UThrowWeponGameInstance* GameInstance =
+			Cast<UThrowWeponGameInstance>(GetGameInstance());
+
+		if (GameInstance && !GameInstance->MyPlayerName.IsEmpty())
+		{
+			// PlayerStateを取得する
+			AThrowWeponPlayerState* ThrowPlayerState =
+				GetPlayerState<AThrowWeponPlayerState>();
+
+			if (ThrowPlayerState)
+			{
+				// サーバー側なら直接保存する
+				if (HasAuthority())
+				{
+					ThrowPlayerState->SetPlayerName(
+						GameInstance->MyPlayerName
+					);
+				}
+				else
+				{
+					// クライアントならサーバーへ名前を送信する
+					ServerSetPlayerName(GameInstance->MyPlayerName);
+				}
+
+				// 送信済みにする
+				bHasSentPlayerName = true;
+			}
+		}
+	}
+
 	// サーバー側で生存中、かつ高さ(Z)が -1000.0f 以下になったら奈落即死
 	if (HasAuthority() && !bIsDead && GetActorLocation().Z < -1000.0f)
 	{
@@ -373,5 +431,20 @@ void AThrowWeponCharacter::Tick(float DeltaTime)
 			LastInstigator,
 			nullptr
 		);
+	}
+}
+
+// サーバー側で実行される名前保存処理
+void AThrowWeponCharacter::ServerSetPlayerName_Implementation(
+	const FString& NewName)
+{
+	// PlayerStateを取得する
+	AThrowWeponPlayerState* ThrowPlayerState =
+		GetPlayerState<AThrowWeponPlayerState>();
+
+	if (ThrowPlayerState)
+	{
+		// 受け取った名前を保存する
+		ThrowPlayerState->SetPlayerName(NewName);
 	}
 }

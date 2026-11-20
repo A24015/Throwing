@@ -17,6 +17,20 @@ class THROWWEPON_API AThrowWeponGameState : public AGameStateBase
 
 public:
 
+	// キルログを全プレイヤーに通知する
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_ShowKillLog(
+		const FString& KillerName,
+		const FString& VictimName
+	);
+
+	// Blueprint側でキルログを表示するイベント
+	UFUNCTION(BlueprintImplementableEvent, Category = "KillLog")
+	void BP_OnKillLogReceived(
+		const FString& KillerName,
+		const FString& VictimName
+	);
+
 	AThrowWeponGameState();
 
 	UPROPERTY(Replicated,BlueprintReadOnly)
