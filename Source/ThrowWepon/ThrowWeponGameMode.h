@@ -88,6 +88,7 @@ public:
 
 	void HideStartText();
 
+	FTimerHandle WeaponRespawnTimerHandle;
 
 	// ƒŠƒUƒ‹ƒgˆ—‚ğs‚¤ŠÖ”
 	UFUNCTION(BlueprintCallable, Category = "Result")

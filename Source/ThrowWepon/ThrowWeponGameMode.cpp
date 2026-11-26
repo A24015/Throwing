@@ -108,21 +108,6 @@ void AThrowWeponGameMode::PostLogin(APlayerController* NewPlayer)
 	// ★ プレイヤーが入った瞬間の自動タイマー開始は削除（ホストのボタン押し待ちにするため）
 }
 
-//// ★ ホストがUIのボタンを押した時に呼ばれる処理
-//void AThrowWeponGameMode::StartMatch()
-//{
-//	// まだタイマーが動いていなければカウントダウン開始！
-//	if (!GetWorldTimerManager().IsTimerActive(CountdownTimerHandle))
-//	{
-//		GetWorldTimerManager().SetTimer(
-//			CountdownTimerHandle,
-//			this,
-//			&AThrowWeponGameMode::UpdateCountdown,
-//			1.0f,
-//			true
-//		);
-//	}
-//}
 
 void AThrowWeponGameMode::StartMatch()
 {
@@ -239,6 +224,14 @@ void AThrowWeponGameMode::HideStartText()
 	{
 		SpawnWeaponWithTags();
 	}
+	// 10秒ごとに空きスポットがあれば武器を1個補充する（間隔は 10.0f を調整）
+	GetWorldTimerManager().SetTimer(
+		WeaponRespawnTimerHandle,
+		this,
+		&AThrowWeponGameMode::SpawnWeaponWithTags,
+		10.0f,
+		true
+	);
 }
 
 // 死亡したプレイヤーをリスポーンさせる処理
@@ -283,7 +276,7 @@ void AThrowWeponGameMode::SpawnWeaponWithTags()
 
 	if (ValidWeaponClasses.Num() == 0)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("[ERROR] No Weapon Class found! Add Tag '%s' to Weapon BP."), *ActiveWeaponTag.ToString()));
+		//if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("[ERROR] No Weapon Class found! Add Tag '%s' to Weapon BP."), *ActiveWeaponTag.ToString()));
 		return;
 	}
 
@@ -293,7 +286,7 @@ void AThrowWeponGameMode::SpawnWeaponWithTags()
 
 	if (FoundPoints.Num() == 0)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("[ERROR] No Spawn Point found! Add Tag '%s' to SpwanTarget."), *SpawnPointTag.ToString()));
+		//if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("[ERROR] No Spawn Point found! Add Tag '%s' to SpwanTarget."), *SpawnPointTag.ToString()));
 		return;
 	}
 
@@ -327,7 +320,7 @@ void AThrowWeponGameMode::SpawnWeaponWithTags()
 
 	if (AvailablePoints.Num() == 0)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("[ERROR] All points are OCCUPIED or blocked by collision!"));
+		//if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("[ERROR] All points are OCCUPIED or blocked by collision!"));
 		return;
 	}
 
@@ -349,7 +342,7 @@ void AThrowWeponGameMode::SpawnWeaponWithTags()
 
 	if (SpawnedActor)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("[SUCCESS] Weapon Spawned Successfully!"));
+		//if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("[SUCCESS] Weapon Spawned Successfully!"));
 	}
 }
 

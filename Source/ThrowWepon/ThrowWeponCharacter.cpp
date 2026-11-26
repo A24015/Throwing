@@ -157,6 +157,25 @@ void AThrowWeponCharacter::Multicast_OnDeath_Implementation()
 // ---------------------------------------------------------
 float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
+	// 追加：自分の投げた武器・自分の攻撃（Kキー自害ボタンを除く）による自爆を完全に無効化
+	if (DamageCauser != this)
+	{
+		// 1. 攻撃者(EventInstigator)が自分自身のControllerである場合
+		if (EventInstigator != nullptr && EventInstigator == GetController())
+		{
+			return 0.0f;
+		}
+
+		// 2. EventInstigatorが未設定(None)でも、武器(DamageCauser)のOwnerやInstigatorが自分である場合
+		if (DamageCauser != nullptr)
+		{
+			if (DamageCauser->GetOwner() == this || DamageCauser->GetOwner() == GetController() || DamageCauser->GetInstigator() == this)
+			{
+				return 0.0f;
+			}
+		}
+	}
+
 	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
 	UE_LOG(LogTemp, Warning, TEXT("★★★ TakeDamage呼ばれた ★★★"));
