@@ -119,6 +119,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	bool PerformLineTrace(FHitResult& OutHitResult, float TraceDistance = 1000.0f);
 
+	// 投げた武器との物理衝突を一時的に無効化する（BPから呼び出し可能）
+	UFUNCTION(BlueprintCallable, Category = "Combat")
+	void IgnoreThrownItemCollision(AActor* ThrownItem);
 public:
 
 	// プレイヤー名をサーバーに送る処理

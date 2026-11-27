@@ -276,10 +276,25 @@ float AThrowWeponCharacter::TakeDamage(float DamageAmount, FDamageEvent const& D
 				LastInstigator = nullptr;
 
 				// 攻撃（DamageCauserあり）で死んだ時だけトドメの特大吹っ飛びを実行する
-				if (DamageCauser)
+				if (DamageCauser || EventInstigator)
 				{
-					float FatalMultiplier = 4.5f;
-					FVector FatalKnockback = (HitDirection + FVector(0.f, 0.f, 0.6f)).GetSafeNormal() * (BaseKnockback * FatalMultiplier);
+					// HitDirection が取れていない場合は攻撃者の位置から計算
+					if (!DamageCauser && EventInstigator && EventInstigator->GetPawn())
+					{
+						HitDirection = (GetActorLocation() - EventInstigator->GetPawn()->GetActorLocation()).GetSafeNormal();
+					}
+
+					// 速度が速すぎて画面外にワープしないよう上限（例: 2200?2800）を設ける
+					float FatalSpeed = FMath::Clamp(BaseKnockback * 2.2f, 1500.0f, 2600.0f);
+
+					// 上方向成分（Z: 0.8f）を強めにして、放物線を描いて高く飛ぶようにする
+					FVector FatalKnockback = (HitDirection + FVector(0.f, 0.f, 0.8f)).GetSafeNormal() * FatalSpeed;
+
+					// 死亡時だけ重力を少し軽くすると、さらに吹っ飛びの軌跡が目で追いやすくなる
+					if (GetCharacterMovement())
+					{
+						GetCharacterMovement()->GravityScale = 0.6f;
+					}
 
 					LaunchCharacter(FatalKnockback, true, true);
 				}
@@ -465,5 +480,69 @@ void AThrowWeponCharacter::ServerSetPlayerName_Implementation(
 	{
 		// 受け取った名前を保存する
 		ThrowPlayerState->SetPlayerName(NewName);
+	}
+}
+
+void AThrowWeponCharacter::IgnoreThrownItemCollision(AActor* ThrownItem)
+{
+	if (!ThrownItem) return;
+
+	// 1. キャラクターのカプセルとメッシュが、その武器を物理的に無視するようにする
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->IgnoreActorWhenMoving(ThrownItem, true);
+	}
+	if (USkeletalMeshComponent* CharMesh = GetMesh())
+	{
+		CharMesh->IgnoreActorWhenMoving(ThrownItem, true);
+	}
+
+	// 2. 武器側のすべてのコリジョンコンポーネントも、自分（キャラクター）を物理的に無視するようにする
+	TArray<UPrimitiveComponent*> PrimComps;
+	ThrownItem->GetComponents<UPrimitiveComponent>(PrimComps);
+	for (UPrimitiveComponent* Comp : PrimComps)
+	{
+		if (Comp)
+		{
+			Comp->IgnoreActorWhenMoving(this, true);
+		}
+	}
+
+	// 3. 0.4秒後（自分から完全に離れた後）に衝突無視を解除する（後で拾えるようにするため）
+	TWeakObjectPtr<AThrowWeponCharacter> WeakThis(this);
+	TWeakObjectPtr<AActor> WeakItem(ThrownItem);
+
+	FTimerHandle IgnoreResetTimer;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			IgnoreResetTimer,
+			[WeakThis, WeakItem]()
+			{
+				if (WeakThis.IsValid() && WeakItem.IsValid())
+				{
+					if (UCapsuleComponent* Capsule = WeakThis->GetCapsuleComponent())
+					{
+						Capsule->IgnoreActorWhenMoving(WeakItem.Get(), false);
+					}
+					if (USkeletalMeshComponent* CharMesh = WeakThis->GetMesh())
+					{
+						CharMesh->IgnoreActorWhenMoving(WeakItem.Get(), false);
+					}
+
+					TArray<UPrimitiveComponent*> Comps;
+					WeakItem->GetComponents<UPrimitiveComponent>(Comps);
+					for (UPrimitiveComponent* Comp : Comps)
+					{
+						if (Comp)
+						{
+							Comp->IgnoreActorWhenMoving(WeakThis.Get(), false);
+						}
+					}
+				}
+			},
+			0.4f,
+			false
+		);
 	}
 }
